@@ -176,23 +176,43 @@ par(mfrow=c(1,1))
 ggplot(form.dat, aes(x=f2,y=f1,col=vowel,shape=vowel)) + geom_point(cex=3) + 
   scale_y_reverse() + scale_x_reverse() + theme_bw()
 
+#### click plot and play audio
+
+spec_play <- function(x, sr) {
+  readline(prompt="Press [enter] to continue and [esc] to exit")
+  
+  phonTools::spectrogram(x, fs=sr, colors=F, dynamicrange=65, maxfreq=8000)
+  
+  repeat {
+    coords <- locator(2)
+    
+    chunk <- x[round(sr*min(coords$x)/1000):round(sr*max(coords$x)/1000)]
+    
+    audio <- sound::as.Sample(as.vector(chunk), sr)
+    
+    sound::play(audio)
+  }
+}
+
 
 ### multiple slices: formant tracking
 winlen  <- 0.01
 
 winlen <- round(sr*winlen)
+winlen # 220 samples - for every 220 samples, do the analysis we just did, and move on to next bin
 bins   <- floor(length(EMA.EMG$audio)/winlen)
 
 chunk <- EMA.EMG$audio[1:winlen]
 plot(chunk, type='l')
+# a prolem is that the start and end are not at zero
 
 
-### windowing
+### windowing - forcing the edges of the signal to go down to zero
 hannwin <- ( 0.5 - (0.5 * cos(2*pi*(0:(winlen-1))/(winlen-1))) )
 plot(hannwin)
 
 hannwin <- phonTools::windowfunc(winlen, type="hanning")
-plot(hannwin*chunk, type='l')
+plot(hannwin*chunk, type='l') #forcing the ends fo zero
 
 
 ### formant tracking
@@ -212,7 +232,7 @@ for (bin in 1:bins) {
   
   formant.tracks[bin,] <- c(midpoint, formants$formant[1:3])
 }
-
+head(formant.tracks)
 
 ### manual clean up
 formant.tracks$f1[formant.tracks$f1 < 250 | formant.tracks$f1 > 1200] <- NA
@@ -224,7 +244,7 @@ formant.tracks$f3[formant.tracks$f3 < 2500 | formant.tracks$f3 > 4000] <- NA
 t1 <- 5.3
 t2 <- 6.3
 
-formant.chunk <- formant.tracks[formant.tracks$time>=t1 & formant.tracks$time<=t2,]
+formant.chunk <- formant.tracks[formant.tracks$time>=t1 & formant.tracks$time<=t2,] #give me formant values between these two time points
 
 
 ### compare to phonTools::spectrogram()
@@ -248,11 +268,15 @@ phonTools::formanttrack(EMA.EMG$audio[round(t1*sr):round(t2*sr)], formants=3,
 
 ### compare to phonTools::spectrogram() using default parameters
 phonTools::formanttrack(EMA.EMG$audio[round(t1*sr):round(t2*sr)], formants=3, fs=sr)
+# actually quite good as like manual tracking!
+
 
 
 ### save formant tracks
 formants <- phonTools::formanttrack(EMA.EMG$audio[round(t1*sr):round(t2*sr)], formants=3, fs=sr, show=F)
 head(formants)
+
+######################
 
 
 ### download second data set
@@ -269,16 +293,44 @@ sound::play(audio)
 
 ### view first ultrasound frame
 grayscale <- gray(seq(0, 1, length = 256))
-image(US.data$data1$images[,,1], xaxt='n', yaxt='n', col=grayscale)
-
+image(US.data$data1$images[,,1], xaxt='n', yaxt='n', col=grayscale) # [, ,1] = give me all rows and columns in the first image
+image(US.data$data1$images[,,2], xaxt='n', yaxt='n', col=grayscale) # [, ,1] = give me all rows and columns in the first image
+image(US.data$data1$images[,,3], xaxt='n', yaxt='n', col=grayscale) # [, ,1] = give me all rows and columns in the first image
 
 ### plot tongue contour
 plot(US.data$data1$contours$coords$x50, US.data$data1$contours$coords$y50, type='l')
-
+US.data$data1$contours$coords$x75
 
 ### breakout group exercise!
 
+# base R requires you to set the range manually. So here we are Conc the different ranges. 
+xrange <- range(c(
+  US.data$data1$contours$palate$x,
+  US.data$data1$contours$coords$x25,
+  US.data$data1$contours$coords$x50,
+  US.data$data1$contours$coords$x75
+))
 
+xrange
+
+yrange <- range(c(
+  US.data$data1$contours$palate$y,
+  US.data$data1$contours$coords$y25,
+  US.data$data1$contours$coords$y50,
+  US.data$data1$contours$coords$y75
+))
+
+yrange
+
+plot(NA, ylim = yrange, xlim = xrange, xlab="<--Posterior (mm) | Anterior (mm) -->", ylab="<-- Interior (mm) | Superior (mm) -->") # rev(xrange) to flip the image horizontally
+points(US.data$data1$contours$coords$x50, US.data$data1$contours$coords$y50, type='l', col="purple")
+points(US.data$data1$contours$coords$x25, US.data$data1$contours$coords$y25, type='l', col="blue")
+points(US.data$data1$contours$coords$x75, US.data$data1$contours$coords$y75, type='l', col="red")
+points(US.data$data1$contours$palate$x, US.data$data1$contours$palate$y, type='l', col="black")
+legend("bottomright", legend=c("25%","50%","75%"), col=c("blue","purple","red"), lty=1)
+
+
+### need to convert for SSanova for tongue splines
 ### Cartesian to polar coordinates
 r  <- sqrt(x^2 + y^2)
 th <- atan2(y, x)
