@@ -3,8 +3,12 @@
 # # # # #
 
 ### install packages
-install.packages(c("RCurl","sound","phonTools","raster","ggplot2"))
-
+#install.packages(c("RCurl","sound","phonTools","raster","ggplot2"))
+library(RCurl)
+library(sound)
+library(phonTools)
+library(raster)
+library(ggplot2)
 
 ### function to download data
 dl_from_dropbox <- function(x, key) {
@@ -33,7 +37,7 @@ sound::setWavPlayer('/bin/mplayer')
 sound::setWavPlayer('C:/Program Files/Window Media Player/wmplayer.exe')
 
 # Mac
-sound::setWavPlayer('/Applications/"QuickTime Player.app"/Contents/MacOS/"QuickTime Player"') 
+sound::setWavPlayer('/Applications/QuickTime Player.app/Contents/MacOS/QuickTime Player') 
 
 
 ### download first data set
@@ -50,20 +54,23 @@ sr <- EMA.EMG$SR$audio
 
 
 ### play audio 
-audio <- sound::as.Sample(as.vector(EMA.EMG$audio), fs=sr)
+audio <- sound::as.Sample(as.vector(EMA.EMG$audio), rate=sr)
+#audio <- sound::as.Sample(as.vector(EMA.EMG$audio[t1:t2]), rate=sr) = play audio from t1 to t2 (see below)
 sound::play(audio)
 
 
 ### view spectrogram
-phonTools::spectrogram(EMA.EMG$audio, fs=sr)
+plot(EMA.EMG$audio,type='l')
+
+phonTools::spectrogram(EMA.EMG$audio, fs=sr) #need to indicate sampling rate
 
 phonTools::spectrogram(EMA.EMG$audio, fs=sr, colors=F)
 
 
 ### choose time points
-EMA.EMG$segments
+EMA.EMG$segments # contains phone and the start/end time of each segment
 
-t1 <- EMA.EMG$segments$start[1]
+t1 <- EMA.EMG$segments$start[1] #this gives up entire duration of entire word (contains five phones)
 t2 <- EMA.EMG$segments$end[5]
 
 t1; t2
@@ -86,17 +93,19 @@ phonTools::spectrogram(EMA.EMG$audio[t1:t2], fs=sr, colors=F, dynamicrange=65, m
 
 
 ### segment vowel by hand
-coords <- locator(2)
+coords <- locator(2) # take any plot that is shown and clicking on the plot will tell you the values. "2" = how many times I will be clicking, and the function will stop after 2 clicks
 
 coords
 
 t1 <- round(coords$x[1]*sr/1000)
 t2 <- round(coords$x[2]*sr/1000)
 
+t1=8538
+t2=12212
 
 ### spectrogram of segmented vowel
 phonTools::spectrogram(EMA.EMG$audio[t1:t2], fs=sr, colors=F, dynamicrange=65, maxfreq=8000)
-
+# will get some black blob. this is because t1 to t2 is the WHOLE audio file, not the excerpt that we got earlier.
 
 ### add offset
 offset <- EMA.EMG$segments$start[1]
@@ -133,8 +142,8 @@ EMA.EMG$segments
 
 vowels <- c("a","e","i","o","{","@")
 
-vowelnum <- sum(EMA.EMG$segments$phone %in% vowels)
-vowelnum
+vowelnum <- sum(EMA.EMG$segments$phone %in% vowels) # exclude consonants
+vowelnum #21 vowels are in there
 
 length(unique(EMA.EMG$segments$word))
 
@@ -152,7 +161,7 @@ for (phone in 1:nrow(EMA.EMG$segments)) {
     
     dur <- t2 - t1
     
-    t20 <- t1 + round(dur*0.2)
+    t20 <- t1 + round(dur*0.2) # to avoid coarticulation
     t80 <- t1 + round(dur*0.8)
     
     formants <- phonTools::findformants(EMA.EMG$audio[t20:t80], fs=sr, verify=F)
